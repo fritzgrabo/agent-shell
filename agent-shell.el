@@ -499,7 +499,9 @@ Returns an empty string if no icon should be displayed."
   (interactive)
   (cond ((or (derived-mode-p 'agent-shell-viewport-view-mode)
              (derived-mode-p 'agent-shell-viewport-edit-mode))
-         (switch-to-buffer (or (agent-shell--shell-buffer :no-create t)
+         (switch-to-buffer (or (agent-shell--shell-buffer
+                                :viewport-buffer (current-buffer)
+                                :no-create t)
                                "No shell available")))
         ((derived-mode-p 'agent-shell-mode)
          (switch-to-buffer (or (agent-shell-viewport--buffer
@@ -2579,15 +2581,23 @@ If FILE-PATH is not an image, returns nil."
                                      (expand-file-name default-directory))))
                 (agent-shell-buffers))))
 
-(cl-defun agent-shell--shell-buffer (&key no-error no-create)
+(cl-defun agent-shell--shell-buffer (&key viewport-buffer no-error no-create)
   "Get an `agent-shell' buffer for the current project.
 
+When VIEWPORT-BUFFER is non-nil, return counterpart.
 When NO-CREATE is nil (default), prompt to create a new shell if none exists.
 When NO-CREATE is non-nil, return existing shell or nil/error if none exists.
 When NO-ERROR is non-nil, return nil instead of raising an error.
 
 Returns a buffer object or nil."
-  (let ((shell-buffer (seq-first (agent-shell-project-buffers))))
+  (let ((shell-buffer (if viewport-buffer
+                          (seq-first (seq-filter (lambda (shell-buffer)
+                                                   (equal (agent-shell-viewport--buffer
+                                                           :shell-buffer shell-buffer
+                                                           :existing-only t)
+                                                          viewport-buffer))
+                                                 (agent-shell-buffers)))
+                        (seq-first (agent-shell-project-buffers)))))
     (if shell-buffer
         shell-buffer
       (if no-create
@@ -2705,15 +2715,16 @@ inserted into the shell buffer prompt."
 
 (cl-defun agent-shell--processed-files (&key files)
   "Process FILES into sendable text with image preview if applicable."
-  (mapconcat (lambda (file)
-               (let ((text (concat "@" file)))
-                 (if-let ((image-display (agent-shell--load-image :file-path file :max-width 200)))
-                     ;; Propertize text to display the image
-                     (propertize text 'display image-display)
-                   ;; Not an image, insert as normal text
-                   text)))
-             files
-             "\n\n"))
+  (when files
+    (mapconcat (lambda (file)
+                 (let ((text (concat "@" file)))
+                   (if-let ((image-display (agent-shell--load-image :file-path file :max-width 200)))
+                       ;; Propertize text to display the image
+                       (propertize text 'display image-display)
+                     ;; Not an image, insert as normal text
+                     text)))
+               files
+               "\n\n")))
 
 (defun agent-shell-send-file (&optional prompt-for-file)
   "Insert a file into `agent-shell'.

@@ -86,6 +86,11 @@ Returns an alist with insertion details or nil otherwise:
              (text (or text (agent-shell--relevant-text) "")))
     (let ((insert-start nil)
           (insert-end nil))
+      ;; Is there text to be inserted? Reject while busy.
+      (when (and (agent-shell-viewport--busy-p
+                  :viewport-buffer viewport-buffer)
+                 (not (string-empty-p (string-trim text))))
+        (user-error "Busy... please wait"))
       (agent-shell--display-buffer viewport-buffer)
       ;; TODO: Do we need to get prompt and partial response,
       ;; in case viewport compose buffer is created for the
@@ -542,9 +547,11 @@ When FORCE-REFRESH is non-nil, recalculate and update cache."
       (setq agent-shell-viewport--position-cache position)
       position)))
 
-(defun agent-shell-viewport--busy-p ()
+(cl-defun agent-shell-viewport--busy-p (&key viewport-buffer)
   "Return non-nil if the associated shell buffer is busy."
-  (when-let ((shell-buffer (agent-shell--shell-buffer :no-error t)))
+  (when-let ((shell-buffer (agent-shell--shell-buffer
+                            :viewport-buffer viewport-buffer
+                            :no-error t)))
     (with-current-buffer shell-buffer
       shell-maker--busy)))
 
