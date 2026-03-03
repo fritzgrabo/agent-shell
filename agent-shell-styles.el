@@ -33,30 +33,45 @@
 
 (declare-function agent-shell--add-text-properties "agent-shell")
 
+(defun agent-shell--short-kind-label (kind)
+  "Return a short label for tool call KIND string."
+  (pcase kind
+    ("search" "find")
+    ("execute" "run")
+    (_ kind)))
+
+(defun agent-shell--status-config (status)
+  "Return alist with :label, :icon, and :face for STATUS string.
+
+  (agent-shell--status-config \"completed\")
+  ;; => ((:label . \"done\") (:icon . \"✓\") (:face . success))"
+  (pcase status
+    ("pending" '((:label . "wait") (:icon . "◇") (:face . font-lock-comment-face)))
+    ("in_progress" '((:label . "busy") (:icon . "◆") (:face . warning)))
+    ("completed" '((:label . "done") (:icon . "✓") (:face . success)))
+    ("failed" '((:label . "error") (:icon . "✗") (:face . error)))
+    (_ '((:label . "unknown") (:icon . "?") (:face . warning)))))
+
 (defun agent-shell--default-status-kind-label (status kind)
   "Default rendering for STATUS and KIND labels.
 STATUS is a string like \"completed\" or nil.
 KIND is a string like \"read\" or nil.
 Returns a propertized string or nil."
-  (let* ((status-config (pcase status
-                          ("pending" '(:label "wait" :face font-lock-comment-face))
-                          ("in_progress" '(:label "busy" :face warning))
-                          ("completed" '(:label "done" :face success))
-                          ("failed" '(:label "error" :face error))
-                          (_ '(:label "unknown" :face warning))))
+  (let* ((status-config (agent-shell--status-config status))
          (label-format (if (display-graphic-p) " %s " "[%s]"))
          (status-text (when status
-                        (let ((label (plist-get status-config :label))
-                              (face (plist-get status-config :face)))
+                        (let ((label (map-elt status-config :label))
+                              (face (map-elt status-config :face)))
                           (agent-shell--add-text-properties
                            (propertize (format label-format label)
                                        'font-lock-face 'default)
                            'font-lock-face (list face '(:inverse-video t))))))
          (kind-text (when kind
                       (let ((box-color (face-foreground
-                                        (plist-get status-config :face) nil t)))
+                                        (map-elt status-config :face) nil t)))
                         (agent-shell--add-text-properties
-                         (propertize (format label-format kind)
+                         (propertize (format label-format
+                                            (agent-shell--short-kind-label kind))
                                      'font-lock-face 'default)
                          'font-lock-face `((:box (:color ,box-color))))))))
     (concat status-text kind-text)))
@@ -73,12 +88,7 @@ default background (70%), so it adapts to any theme.
 STATUS is a string like \"completed\" or nil.
 KIND is a string like \"read\" or nil.
 Returns a propertized string or nil."
-  (let* ((status-config (pcase status
-                          ("pending" '((:label . "wait") (:face . font-lock-comment-face)))
-                          ("in_progress" '((:label . "busy") (:face . warning)))
-                          ("completed" '((:label . "done") (:face . success)))
-                          ("failed" '((:label . "error") (:face . error)))
-                          (_ '((:label . "unknown") (:face . warning)))))
+  (let* ((status-config (agent-shell--status-config status))
          (fg (face-foreground (map-elt status-config :face) nil t))
          (bg-base (face-background 'default nil t))
          (bg (when (and fg bg-base)
@@ -95,7 +105,8 @@ Returns a propertized string or nil."
                                     `(:background ,bg :foreground ,fg
                                       :weight bold))))
          (kind-text (when kind
-                      (propertize (format label-format kind)
+                      (propertize (format label-format
+                                         (agent-shell--short-kind-label kind))
                                   'font-lock-face
                                   `(:background ,bg :foreground ,fg
                                     :slant italic)))))
@@ -113,12 +124,7 @@ Returns a propertized string or nil."
 STATUS is a string like \"completed\" or nil.
 KIND is a string like \"read\" or nil.
 Returns a propertized string or nil."
-  (let ((status-config (pcase status
-                         ("pending" '((:icon . "◇") (:face . font-lock-comment-face)))
-                         ("in_progress" '((:icon . "◆") (:face . warning)))
-                         ("completed" '((:icon . "✓") (:face . success)))
-                         ("failed" '((:icon . "✗") (:face . error)))
-                         (_ '((:icon . "?") (:face . warning)))))
+  (let ((status-config (agent-shell--status-config status))
         (status-text nil)
         (kind-text nil))
     (when status
@@ -126,7 +132,7 @@ Returns a propertized string or nil."
                                     'font-lock-face
                                     (map-elt status-config :face))))
     (when kind
-      (setq kind-text (propertize kind
+      (setq kind-text (propertize (agent-shell--short-kind-label kind)
                                   'font-lock-face 'font-lock-type-face)))
     (if (and status-text kind-text)
         (concat status-text " " kind-text)
@@ -141,12 +147,7 @@ Returns a propertized string or nil."
 STATUS is a string like \"completed\" or nil.
 KIND is a string like \"read\" or nil.
 Returns a propertized string or nil."
-  (let* ((status-config (pcase status
-                          ("pending" '((:label . "wait") (:face . font-lock-comment-face)))
-                          ("in_progress" '((:label . "busy") (:face . warning)))
-                          ("completed" '((:label . "done") (:face . success)))
-                          ("failed" '((:label . "error") (:face . error)))
-                          (_ '((:label . "unknown") (:face . warning)))))
+  (let* ((status-config (agent-shell--status-config status))
          (face (map-elt status-config :face))
          (label-format (if (display-graphic-p) " %s " "[%s]"))
          (status-text (when status
@@ -154,7 +155,8 @@ Returns a propertized string or nil."
                                            (map-elt status-config :label))
                                     'font-lock-face face)))
          (kind-text (when kind
-                      (propertize (format label-format kind)
+                      (propertize (format label-format
+                                         (agent-shell--short-kind-label kind))
                                   'font-lock-face face))))
     (concat status-text kind-text)))
 
